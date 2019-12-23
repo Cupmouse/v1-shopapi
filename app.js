@@ -124,7 +124,7 @@ checkPassword = function(req, res, next) {
     // an access will be denied
     next(createError(400, 'Invalid parameters'));
   } else if (req.body.user_id.length < 3 || req.body.password.length < 5) {
-      next(createError(400, 'Invalid parameters'));
+    next(createError(400, 'Invalid parameters'));
   } else {
     next();
   }
@@ -133,20 +133,31 @@ checkPassword = function(req, res, next) {
 checkCaptcha = function(req, res, next) {
   if (req.body === undefined || typeof req.body.token !== 'string') {
     next(createError(400, 'Invalid parameters'));
+    return;
   }
 
-  const secretKey = '6Ld4uMcUAAAAAEQtXX2fSyuEHApT10CBvIu9Ai-0';
+  const secretKey = '6LfFackUAAAAALRDhZuVX0bPMsZR3oDpw1qru7gh';
   const token = req.body.token;
   const recaptcha_url = 'https://www.google.com/recaptcha/api/siteverify';
   
   request.post(recaptcha_url, {
-    secret: secretKey,
-    response: token,
+    headers: {'content-type' : 'application/x-www-form-urlencoded'},
+    form: {
+      secret: secretKey,
+      response: token,
+    },
   }, function(error, response, body) {
+    if (error) {
+      next(createError(400, 'ReCaptcha verification failed'));
+      return;
+    }
+
     body = JSON.parse(body);
 
     if(body.success !== undefined && !body.success) {
-      next(createError(400, 'Captcha verification failed'));
+      next(createError(400, 'ReCaptcha verification failed'));
+    } else {
+      next();
     }
   });
 };
