@@ -19,7 +19,7 @@ app.use(helmet());
 const saltRounds = 13;
 const length_session_id = 64;
 const session_time = 30 * 60 * 1000; // 30 minutes
-const num_limit = 50;
+const num_limit = 10;
 const path_data_db = './items.db';
 
 const redcli = redis.createClient();
@@ -97,7 +97,7 @@ app.post('/search', function(req, res, next) {
         params.push(0);
       }
 
-      sqlite.prepare('SELECT * FROM items' + where + ' LIMIT ' + num_limit + ' OFFSET ?', function (err) {
+      sqlite.prepare('SELECT * FROM items' + where + ' ORDER BY date_start DESC LIMIT ' + num_limit + ' OFFSET ?', function (err) {
         if (err) {
           next(createError(500, 'Database error'));
           return;
