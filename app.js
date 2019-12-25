@@ -16,11 +16,18 @@ app.use(express.json());
 // app.use(express.urlencoded({ extended: false }));
 app.use(helmet());
 
-const saltRounds = 13;
-const length_session_id = 64;
-const session_time = 30 * 60 * 1000; // 30 minutes
-const num_limit = 10;
-const path_data_db = './items.db';
+const SALT_ROUNDS = 13;
+const LENGTH_SESSION_ID = 64;
+const SESSION_TIME = 30 * 60 * 1000; // 30 minutes
+const NUL_LIMIT = 10;
+const SQL_PRICE = (col,as) => 'CAST(3*100*CAST(' + col + ' AS REAL)/1024/1024/1024 AS INTEGER) AS ' + as;
+const PRICE = 3n;
+const CALC_PRICE = (raw_size) => {
+  const sum = BigInt(raw_size);
+
+  return Number(sum * PRICE * 100n / 1073741824n);
+};
+const PATH_DATA_DB = './items.db';
 
 const redcli = redis.createClient();
 const redisGet = util.promisify(redcli.GET).bind(redcli);
@@ -29,7 +36,7 @@ const redisSetnx = util.promisify(redcli.SETNX).bind(redcli);
 const redisDel = util.promisify(redcli.DEL).bind(redcli);
 const redisPexpire = util.promisify(redcli.PEXPIRE).bind(redcli);
 
-const sqlite = new sqlite3.Database(path_data_db);
+const sqlite = new sqlite3.Database(PATH_DATA_DB);
 const sqlitePrepare = util.promisify(sqlite.prepare).bind(sqlite);
 
 const randomBytes = util.promisify(crypto.randomBytes).bind(crypto);
@@ -38,7 +45,7 @@ const randomBytes = util.promisify(crypto.randomBytes).bind(crypto);
 app.post('/search', function(req, res, next) {
   let constrains = [];
   let params = [];
-  if (req.body.exchanges !== undefined && Array.isArray(req.body.exchanges)) {
+  if (typeof req.body.exchanges !== 'undefined' && Array.isArray(req.body.exchanges)) {
     let sql_or = [];
     req.body.exchanges.forEach(exchange => {
       if (typeof exchange === 'string') {
@@ -48,7 +55,7 @@ app.post('/search', function(req, res, next) {
     });
     constrains.push('(' + sql_or.join(' OR ') + ')');
   }
-  if (req.body.pairs !== undefined && Array.isArray(req.body.pairs)) {
+  if (typeof req.body.pairs !== 'undefined' && Array.isArray(req.body.pairs)) {
     let sql_or = [];
     req.body.pairs.forEach(pair => {
       if (typeof pair === 'string') {
@@ -59,12 +66,12 @@ app.post('/search', function(req, res, next) {
     });
     constrains.push('(' + sql_or.join(' AND ') + ')');
   }
-  if (req.body.date_start !== undefined && typeof req.body.date_start === 'number' && Number.isInteger(req.body.date_start)) {
+  if (typeof req.body.date_start !== 'undefined' && typeof req.body.date_start === 'number' && Number.isInteger(req.body.date_start)) {
     constrains.push('date_end >= ?');
     params.push(req.body.date_start);
   }
 
-  if (req.body.date_end !== undefined && typeof req.body.date_end === 'number' && Number.isInteger(req.body.date_end)) {
+  if (typeof req.body.date_end !== 'undefined' && typeof req.body.date_end === 'number' && Number.isInteger(req.body.date_end)) {
     constrains.push('date_start <= ?');
     params.push(req.body.date_end);
   }
@@ -76,12 +83,14 @@ app.post('/search', function(req, res, next) {
 
   sqlite.prepare('SELECT count(*) AS count FROM items' + where, function(err) {
     if (err) {
+      console.log(err);
       next(createError(500, 'Database error'));
       return;
     }
 
     this.get(params, (err, get_res) => {
       if (err) {
+        console.log(err);
         next(createError(500, 'Database error'));
         this.finalize();
         return;
@@ -89,22 +98,28 @@ app.post('/search', function(req, res, next) {
       const count = get_res['count'];
       this.finalize();
 
-      const num_pages = Math.max(Math.ceil(count/num_limit), 1);
+      const num_pages = Math.max(Math.ceil(count/NUL_LIMIT), 1);
 
-      if (req.body.page !== undefined && typeof req.body.page === 'number' && Number.isInteger(req.body.page) && 1 <= req.body.page) {
-        params.push(num_limit*(req.body.page-1));
+      if (typeof req.body.page !== 'undefined' && typeof req.body.page === 'number' && Number.isInteger(req.body.page) && 1 <= req.body.page) {
+        params.push(NUL_LIMIT*(req.body.page-1));
       } else {
         params.push(0);
       }
 
-      sqlite.prepare('SELECT * FROM items' + where + ' ORDER BY date_start DESC LIMIT ' + num_limit + ' OFFSET ?', function (err) {
+      const sql = 'SELECT id, exchange, pairs, date_start, date_end, raw_size, '
+        + SQL_PRICE('raw_size', 'price') + ' FROM items'
+        + where + ' ORDER BY date_start DESC LIMIT ' + NUL_LIMIT + ' OFFSET ?';
+
+      sqlite.prepare(sql, function (err) {
         if (err) {
+          console.log(err);
           next(createError(500, 'Database error'));
           return;
         }
 
         this.all(params, (err, rows) => {
           if (err) {
+            console.log(err);
             next(createError(500, 'Database error'));
           } else {
             res.json({
@@ -119,8 +134,48 @@ app.post('/search', function(req, res, next) {
   });
 });
 
+app.post('/getitem', function(req, res, next) {
+  if (typeof req.body !== 'undefined' && Array.isArray(req.body)) {
+    const ids = req.body;
+
+    const parameters = Array(ids.length).fill('?').join(', ');
+
+    const sql = 'SELECT id, name, raw_size FROM items WHERE id IN (' + parameters + ') '
+      + 'UNION SELECT -1, "", sum(raw_size) FROM items WHERE id IN (' + parameters + ') ';
+
+    sqlite.prepare(sql, function(err) {
+      if (err) {
+        console.log(err);
+        next(createError(500, 'Database error'));
+        return;
+      }
+
+      this.all(ids.concat(ids), (err, rows) => {
+        if (err) {
+          console.log(err);
+          next(createError(500, 'Database error'));
+          return;
+        }
+
+        const sum_size = rows[0].raw_size === null ? 0 : rows[0].raw_size;
+        res.json({
+          items: rows.slice(1),
+          sum_size: sum_size,
+          sum_price: CALC_PRICE(sum_size),
+        });
+      });
+    });
+  } else {
+    res.json({
+      items: [],
+      sum_size: 0,
+      sum_price: 0,
+    });
+  }
+});
+
 checkPassword = function(req, res, next) {
-  if (req.body === undefined || typeof req.body.user_id !== 'string' || typeof req.body.password !== 'string') {
+  if (typeof req.body === 'undefined' || typeof req.body.user_id !== 'string' || typeof req.body.password !== 'string') {
     // an access will be denied
     next(createError(400, 'Invalid parameters'));
   } else if (req.body.user_id.length < 3 || req.body.password.length < 5) {
@@ -131,7 +186,7 @@ checkPassword = function(req, res, next) {
 };
 
 checkCaptcha = function(req, res, next) {
-  if (req.body === undefined || typeof req.body.token !== 'string') {
+  if (typeof req.body === 'undefined' || typeof req.body.token !== 'string') {
     next(createError(400, 'Invalid parameters'));
     return;
   }
@@ -154,7 +209,7 @@ checkCaptcha = function(req, res, next) {
 
     body = JSON.parse(body);
 
-    if(body.success !== undefined && !body.success) {
+    if(typeof body.success !== 'undefined' && !body.success) {
       next(createError(400, 'ReCaptcha verification failed'));
     } else {
       next();
@@ -168,7 +223,7 @@ app.post('/signup', checkPassword, checkCaptcha, function(req, res, next) {
 
   const key_password = 'password#'+user_id;
 
-  bcrypt.hash(password, saltRounds)
+  bcrypt.hash(password, SALT_ROUNDS)
   .then((hashed) => redisSetnx(key_password, hashed))
   .then((set) => {
     if (set === 1) {
@@ -203,7 +258,7 @@ app.post('/login', checkPassword, checkCaptcha, function(req, res, next) {
   }).then((is_correct) => {
     if (is_correct) {
       // generate new session id
-      return randomBytes(length_session_id);
+      return randomBytes(LENGTH_SESSION_ID);
     } else {
       // failed login
       return Promise.reject('failed');
@@ -215,7 +270,7 @@ app.post('/login', checkPassword, checkCaptcha, function(req, res, next) {
   }).then((result) => {
     if (result === 'OK') {
       // set default expiery time
-      return redisPexpire(key_session, session_time);
+      return redisPexpire(key_session, SESSION_TIME);
     } else {
       return Promise.reject('notok');
     }
@@ -272,7 +327,7 @@ extendSession = function(req, res, next) {
   key_session = 'session#' + user_id;
 
   // make session time longer
-  redisPexpire(key_session, session_time)
+  redisPexpire(key_session, SESSION_TIME)
   .then((timeout) => {
     if (timeout === 1) {
       next();
