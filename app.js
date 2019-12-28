@@ -16,6 +16,7 @@ const DATA_PATH = '/home/shimaoka/data/items/bitflyer/'
 const DOWNLOAD_LIMIT = 3;
 const RECAPTCHA_SECRET = '6LfFackUAAAAALRDhZuVX0bPMsZR3oDpw1qru7gh';
 const RECAPTCHA_URL = 'https://www.google.com/recaptcha/api/siteverify';
+const SQL_BATCH_SIZE = 400;
 
 const createError = require('http-errors');
 const express = require('express');
@@ -72,6 +73,15 @@ const sqlitePrepare = util.promisify(sqlite.prepare).bind(sqlite);
 
 const randomBytes = util.promisify(crypto.randomBytes).bind(crypto);
 
+const makeSQLBatch = (data) => {
+  const batches = [];
+
+  for (let i = 0; i < data.length; i+=SQL_BATCH_SIZE) {
+    batches.push(data.slice(i, i+SQL_BATCH_SIZE));
+  }
+
+  return batches;
+}
 
 app.post('/search', function(req, res, next) {
   let constrains = [];
@@ -112,6 +122,7 @@ app.post('/search', function(req, res, next) {
     where = ' WHERE ' + constrains.join(' AND ');
   }
 
+  let ids;
   sqlite.prepare('SELECT id FROM items' + where, function(err) {
     if (err) {
       console.log(err);
@@ -126,7 +137,7 @@ app.post('/search', function(req, res, next) {
         this.finalize();
         return;
       }
-      const ids = rows.map(row => row.id);
+      ids = rows.map(row => row.id);
       this.finalize();
 
       const num_pages = Math.max(Math.ceil(ids.length/NUL_LIMIT), 1);
@@ -167,43 +178,60 @@ app.post('/search', function(req, res, next) {
 });
 
 app.post('/cart', function(req, res, next) {
-  if (typeof req.body !== 'undefined' && Array.isArray(req.body)) {
-    const ids = req.body;
-
-    const parameters = Array(ids.length).fill('?').join(', ');
-
-    const sql = 'SELECT id, name, raw_size FROM items WHERE id IN (' + parameters + ') '
-      + 'UNION SELECT -1, "", sum(raw_size) FROM items WHERE id IN (' + parameters + ') ';
-
-    sqlite.prepare(sql, function(err) {
-      if (err) {
-        console.log(err);
-        next(createError(500, 'Database error'));
-        return;
-      }
-
-      this.all(ids.concat(ids), (err, rows) => {
-        if (err) {
-          console.log(err);
-          next(createError(500, 'Database error'));
-          return;
-        }
-
-        const sum_size = rows[0].raw_size === null ? 0 : rows[0].raw_size;
-        res.json({
-          items: rows.slice(1),
-          sum_size: sum_size,
-          sum_price: CALC_PRICE(sum_size),
-        });
-      });
-    });
-  } else {
+  if (req.body === undefined
+    || !Array.isArray(req.body)
+    || req.body.some(id => typeof id !== 'number' || !Number.isInteger(id))) {
     res.json({
       items: [],
       sum_size: 0,
       sum_price: 0,
     });
+    return;
   }
+
+  const ids = req.body;
+  const batches = makeSQLBatch(ids);
+
+  // split sql query into batch
+  Promise.all(batches.map(batch => {
+    const parameters = Array(batch.length).fill('?').join(', ');
+
+    const sql = 'SELECT id, name, raw_size FROM items WHERE id IN (' + parameters + ') '
+      + 'UNION SELECT -1, "", sum(raw_size) FROM items WHERE id IN (' + parameters + ') ';
+
+    return new Promise((resolve, reject) => {
+      sqlite.prepare(sql, function(err) {
+        if (err)
+          reject(err);
+        else
+          resolve(this);
+      });
+    }).then(stmt => {
+      return new Promise((resolve, reject) => {
+        stmt.all(batch.concat(batch), (err, rows) => {
+          if (err)
+            reject(err);
+          else
+            resolve(rows);
+        });
+      })
+    }).then(rows => {
+      const sum_size = rows[0].raw_size === null ? 0 : rows[0].raw_size;
+      return [ rows.slice(1), sum_size ];
+    });
+  })).then(batch_results => {
+    const total_items = batch_results.map(batch_result => batch_result[0]).flat(1);
+    const total_sum_size = batch_results.map(batch_result => batch_result[1]).reduce((a, b) => a + b, 0);
+
+    res.json({
+      items: total_items,
+      sum_size: total_sum_size,
+      sum_price: CALC_PRICE(total_sum_size),
+    });
+  }).catch(err => {
+    console.log(err);
+    next(createError(500, 'Database error'));
+  });
 });
 
 app.post('/sample', function(req, res, next) {
@@ -570,27 +598,32 @@ app.post('/purchase', checkSession, extendSession, function(req, res, next) {
 
     value = order.result.purchase_units[0].amount.value;
 
-    const parameters = Array(ids.length).fill('?').join(', ');
+    const batches = makeSQLBatch(ids);
 
-    return new Promise((resolve, reject) => {
-      sqlite.prepare('SELECT sum(raw_size) as sum_size FROM items WHERE id IN (' + parameters + ') ', function(err) {
-        if (err)
-          reject(err);
-        else
-          resolve(this);
+    return Promise.all(batches.map(batch => {
+      const parameters = Array(batch.length).fill('?').join(', ');
+
+      return new Promise((resolve, reject) => {
+        sqlite.prepare('SELECT sum(raw_size) as sum_size FROM items WHERE id IN (' + parameters + ') ', function(err) {
+          if (err)
+            reject(err);
+          else
+            resolve(this);
+        });
+      }).then(stmt => {
+        return new Promise((resolve, reject) => {
+          stmt.get(batch, (err, row) => {
+            if (err)
+              reject(err);
+            else
+              resolve(row.sum_size);
+          });
+        });
       });
+    })).then(sum_size_arr => {
+      return sum_size_arr.reduce((a, b) => a + b, 0);
     });
-  }).then(stmt => {
-    return new Promise((resolve, reject) => {
-      stmt.get(ids, (err, row) => {
-        if (err)
-          reject(err);
-        else
-          resolve(row);
-      });
-    });
-  }).then(row => {
-    sum_size = row.sum_size;
+  }).then(sum_size => {
     const bigprice = CALC_PRICE(sum_size);
 
     if (bigprice < 500)
@@ -705,25 +738,31 @@ app.post('/order', checkSession, extendSession, function(req, res, next) {
 
     ids = Object.keys(idvcodes);
 
-    return new Promise((resolve, reject) => {
-      const sql = 'SELECT id, name, raw_size FROM items WHERE id IN (' + Array(ids.length).fill('?').join(', ') + ')';
+    const batches = makeSQLBatch(ids);
 
-      sqlite.prepare(sql, function(err) {
-        if (err)
-          reject(err);
-        else
-          resolve(this);
+    return Promise.all(batches.map(batch => {
+      return new Promise((resolve, reject) => {
+        const sql = 'SELECT id, name, raw_size FROM items WHERE id IN (' + Array(batch.length).fill('?').join(', ') + ')';
+
+        sqlite.prepare(sql, function(err) {
+          if (err) {
+            this.finalize();
+            reject(err);
+          } else
+            resolve(this);
+        });
+      }).then(stmt => {
+        return new Promise((resolve, reject) => {
+          stmt.all(batch, (err, rows) => {
+            stmt.finalize();
+            if (err)
+              reject(err);
+            else
+              resolve(rows);
+          });
+        });
       });
-    });
-  }).then(stmt => {
-    return new Promise((resolve, reject) => {
-      stmt.all(ids, (err, rows) => {
-        if (err)
-          reject(err);
-        else
-          resolve(rows);
-      });
-    });
+    })).then(rows_array => rows_array.flat(1));
   }).then(rows => {
     items = rows;
 
