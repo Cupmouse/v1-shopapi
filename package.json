@@ -6,12 +6,16 @@
     "start": "node ./bin/www"
   },
   "dependencies": {
+    "@paypal/checkout-server-sdk": "^1.0.2",
+    "base64url": "^3.0.1",
     "bcrypt": "^3.0.7",
+    "cors": "^2.8.5",
     "debug": "~2.6.9",
     "express": "~4.16.1",
     "express-session": "^1.17.0",
     "helmet": "^3.21.2",
     "http-errors": "~1.6.3",
+    "moment": "^2.24.0",
     "morgan": "^1.9.1",
     "redis": "^2.8.0",
     "sqlite3": "^4.1.1"
