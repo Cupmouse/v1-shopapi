@@ -10,8 +10,12 @@ const CALC_PRICE = (raw_size) => {
   return Number(sum * PRICE * 100n / 1073741824n);
 };
 const PATH_DATA_DB = './items.db';
-const PAYPAL_ID = 'ATdZPSLf61TWnm1v7iYfTvVY0BtoitHdKxjZBHmUZmAXPZyp5U2x3KUCNoYn0d65eTzOCkRvSqotyv2z';
-const PAYPAL_SECRET = 'EG7pocZM097wbmqNIdvBYtNqKf56YWSOU46kAPededPajJ_BURphY7AnRrnI_jfV4B-1dXjFxHdb7mLn';
+const PAYPAL_ID = process.env.NODE_ENV === 'production' ?
+  'AfVrtn4Iog5c7b8cIRE7-QIHIBXkH8f4lRgMDlSBENNoQwF37_tos0kwMR9ZVQy2NSbOKk32lZ9X5doD' :
+  'ATdZPSLf61TWnm1v7iYfTvVY0BtoitHdKxjZBHmUZmAXPZyp5U2x3KUCNoYn0d65eTzOCkRvSqotyv2z';
+const PAYPAL_SECRET = process.env.NODE_ENV === 'production' ?
+  'EMF4fDLEhQdRV5CPKSLc6pZMr4ruRo2kHxekrzzgeUVWvzXzhG5rDWLVrnPKRUb5Vjk2WYs1JEtDnKtk' :
+  'EG7pocZM097wbmqNIdvBYtNqKf56YWSOU46kAPededPajJ_BURphY7AnRrnI_jfV4B-1dXjFxHdb7mLn';
 const DATA_PATH = '/home/shimaoka/data/items/bitflyer/'
 const DOWNLOAD_LIMIT = 3;
 const RECAPTCHA_SECRET = '6LfFackUAAAAALRDhZuVX0bPMsZR3oDpw1qru7gh';
@@ -41,7 +45,7 @@ const payPalClient = () => {
   );
 };
 const cors_option = {
-  origin: 'http://localhost:3000',
+  origin: process.env.NODE_ENV === 'production' ? 'https://shopapi.exchangedataset.cc/' : 'http://localhost:3000',
 };
 const app = express();
 
@@ -623,8 +627,11 @@ app.post('/purchase', checkSession, extendSession, function(req, res, next) {
     })).then(sum_size_arr => {
       return sum_size_arr.reduce((a, b) => a + b, 0);
     });
-  }).then(sum_size => {
+  }).then(total_sum_size => {
+    sum_size = total_sum_size;
     const bigprice = CALC_PRICE(sum_size);
+
+    console.log(total_sum_size, bigprice);
 
     if (bigprice < 500)
       return Promise.reject('toosmall');
