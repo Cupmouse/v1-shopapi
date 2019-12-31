@@ -1,12 +1,9 @@
-const express = require('express');
 const createError = require('http-errors');
 
 const { makeSQLBatch } = require('../utils/sqlite');
 
 module.exports = (redis, sqlite) => {
-  const router = express.Router();
-
-  router.post('*', (req, res, next) => {
+  return (req, res, next) => {
     if (typeof req.body.order_id !== 'string') {
       next(createError(400, 'Invalid parameter'));
       return;
@@ -98,7 +95,5 @@ module.exports = (redis, sqlite) => {
         next(createError(500, 'Database error'));
       }
     });
-  });
-
-  return router;
-}
+  };
+};
