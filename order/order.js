@@ -1,7 +1,7 @@
 const express = require('express');
 const createError = require('http-errors');
 
-const { makeSQLBatch } = require('./utils/sqlite');
+const { makeSQLBatch } = require('../utils/sqlite');
 
 module.exports = (redis, sqlite) => {
   const router = express.Router();

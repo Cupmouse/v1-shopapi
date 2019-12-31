@@ -5,8 +5,8 @@ const fs = require('fs');
 const zlib = require('zlib');
 const readline = require('readline');
 
-const { NUL_LIMIT, SQL_PRICE, CALC_PRICE, DATA_PATH } = require('./common');
-const { makeSQLBatch } = require('./utils/sqlite');
+const { NUL_LIMIT, SQL_PRICE, CALC_PRICE, DATA_PATH } = require('../common');
+const { makeSQLBatch } = require('../utils/sqlite');
 
 module.exports = (sqlite) => {
   const router = express.Router();

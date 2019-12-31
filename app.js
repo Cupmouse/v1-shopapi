@@ -3,31 +3,26 @@ const express = require('express');
 const createError = require('http-errors');
 const logger = require('morgan');
 const helmet = require('helmet');
-const cors = require('cors')
-const bcrypt = require('bcrypt');
-const util = require('util');
+const cors = require('cors');
 const sqlite3 = require('sqlite3');
 
 const { CORS_ORIGIN, PATH_DATA_DB } = require('./common');
+
 const Redis = require('./utils/redis');
 
-const cors_option = {
-  origin: CORS_ORIGIN,
-};
 const sqlite = new sqlite3.Database(PATH_DATA_DB);
 const redis = new Redis();
 
-const userRouter = require('./user');
-const shopRouter = require('./shop');
-const orderRouter = require('./order');
+const userRouter = require('./user/user');
+const shopRouter = require('./shop/shop');
+const orderRouter = require('./order/order');
 const getRouter = require('./get');
 
 const app = express();
 
 app.use(logger('dev'));
-app.use(cors(cors_option))
+app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
-// app.use(express.urlencoded({ extended: false }));
 app.use(helmet());
 
 app.use('/user', userRouter(redis, sqlite));

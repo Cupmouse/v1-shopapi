@@ -1,3 +1,7 @@
+const request = require('request');
+
+const { RECAPTCHA_URL, RECAPTCHA_SECRET } = require('../common');
+
 exports.checkCaptcha = (req, res, next) => {
   if (typeof req.body === 'undefined' || typeof req.body.token !== 'string') {
     next(createError(400, 'Invalid parameters'));
