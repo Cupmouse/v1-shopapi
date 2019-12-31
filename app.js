@@ -16,7 +16,9 @@ const PAYPAL_ID = process.env.NODE_ENV === 'production' ?
 const PAYPAL_SECRET = process.env.NODE_ENV === 'production' ?
   'EMF4fDLEhQdRV5CPKSLc6pZMr4ruRo2kHxekrzzgeUVWvzXzhG5rDWLVrnPKRUb5Vjk2WYs1JEtDnKtk' :
   'EG7pocZM097wbmqNIdvBYtNqKf56YWSOU46kAPededPajJ_BURphY7AnRrnI_jfV4B-1dXjFxHdb7mLn';
-const DATA_PATH = '/home/shimaoka/data/items/bitflyer/'
+const DATA_PATH = process.env.NODE_ENV === 'production' ?
+  '/home/exchangedatasets/HDD/items/' :
+  '/home/shimaoka/data/items/';
 const DOWNLOAD_LIMIT = 3;
 const RECAPTCHA_SECRET = '6LfFackUAAAAALRDhZuVX0bPMsZR3oDpw1qru7gh';
 const RECAPTCHA_URL = 'https://www.google.com/recaptcha/api/siteverify';
@@ -45,7 +47,7 @@ const payPalClient = () => {
   );
 };
 const cors_option = {
-  origin: process.env.NODE_ENV === 'production' ? 'https://shopapi.exchangedataset.cc/' : 'http://localhost:3000',
+  origin: process.env.NODE_ENV === 'production' ? 'https://shop.exchangedataset.cc/' : 'http://localhost:3000',
 };
 const app = express();
 
