@@ -24,14 +24,3 @@ exports.CALC_PRICE = (raw_size) => {
   return Number(sum * exports.PRICE * 100n / 1073741824n);
 };
 exports.CORS_ORIGIN = process.env.NODE_ENV === 'production' ? 'https://shop.exchangedataset.cc/' : 'http://localhost:3000'
-exports.IllegalInputError = class IllegalInputError extends Error {
-  constructor (...params) {
-    super(...params)
-
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, IllegalInputError)
-    }
-
-    this.name = 'IllegalInputError'
-  }
-}

@@ -1,6 +1,6 @@
 const { SQL_BATCH_SIZE } = require('../common')
 
-exports.makeSQLBatch = (data) => {
+exports.makeSQLBatch = data => {
   const batches = []
 
   for (let i = 0; i < data.length; i += SQL_BATCH_SIZE) {

@@ -15,7 +15,7 @@ module.exports = redis => {
     const keySession = 'user:' + userId + ':session'
 
     redis.GET(keySession)
-      .then((stored) => {
+      .then(stored => {
         if (stored === sessionId) {
         // session id matched, great!
           next()
@@ -23,9 +23,8 @@ module.exports = redis => {
         // wrong session id
           redis.DEL(keySession).then((num) => next(createError(401, 'You are not logged in')))
         }
-      }).catch((err) => {
-        console.log(err)
-        next(createError(500, 'Internal error'))
+      }).catch(err => {
+        next(err)
       })
   }
 }

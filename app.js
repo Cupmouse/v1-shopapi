@@ -41,11 +41,16 @@ app.use((err, req, res, next) => {
   res.locals.message = err.message
   res.locals.error = req.app.get('env') === 'development' ? err : {}
 
-  console.log(err.message)
-  const statusCode = err.statusCode === undefined ? 500 : err.statusCode
-  res.status(statusCode).json({
-    error: err.message
-  })
+  if (err.statusCode === undefined) {
+    console.error(err)
+    res.status(500).json({
+      error: 'Internal error'
+    })
+  } else {
+    res.status(err.statusCode).json({
+      error: err.message
+    })
+  }
 })
 
 module.exports = app

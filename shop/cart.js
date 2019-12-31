@@ -1,5 +1,3 @@
-const createError = require('http-errors')
-
 const { CALC_PRICE } = require('../common')
 const { makeSQLBatch } = require('../utils/sqlite')
 
@@ -61,8 +59,7 @@ module.exports = sqlite => {
         sum_price: CALC_PRICE(totalSumSize)
       })
     }).catch(err => {
-      console.log(err)
-      next(createError(500, 'Internal error'))
+      next(err)
     })
   }
 }

@@ -1,4 +1,3 @@
-const createError = require('http-errors')
 const { SESSION_TIME } = require('../common')
 
 module.exports = redis => {
@@ -15,8 +14,7 @@ module.exports = redis => {
           throw Error('PEXPIRE failed')
         }
       }).catch(err => {
-        console.log(err)
-        next(createError(500, 'Internal error'))
+        next(err)
       })
   }
 }

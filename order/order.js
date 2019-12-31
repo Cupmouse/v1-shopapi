@@ -1,7 +1,6 @@
 const createError = require('http-errors')
 
 const { makeSQLBatch } = require('../utils/sqlite')
-const { IllegalInputError } = require('../common')
 
 module.exports = (redis, sqlite) => {
   return (req, res, next) => {
@@ -20,7 +19,7 @@ module.exports = (redis, sqlite) => {
 
     redis.HGETALL('order:' + orderId + ':item').then(hgetall => {
       if (hgetall === null) {
-        throw IllegalInputError('Unknown order ID')
+        throw createError(400, 'Unknown order ID')
       }
 
       Object.entries(hgetall).forEach(entry => {
@@ -92,12 +91,7 @@ module.exports = (redis, sqlite) => {
         total
       })
     }).catch(err => {
-      if (err instanceof IllegalInputError) {
-        next(createError(400, err.message))
-      } else {
-        console.log(err)
-        next(createError(500, 'Internal error'))
-      }
+      next(err)
     })
   }
 }

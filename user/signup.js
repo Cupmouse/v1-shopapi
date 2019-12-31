@@ -20,11 +20,10 @@ module.exports = redis => {
             success: 'User created'
           })
         } else {
-          next(createError(401, 'User with id "' + userId + '" already exists'))
+          throw createError(400, 'User with id "' + userId + '" already exists')
         }
-      }).catch((err) => {
-        console.log(err)
-        next(createError(500, 'Internal error'))
+      }).catch(err => {
+        next(err)
       })
   }
 }

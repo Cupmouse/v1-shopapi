@@ -4,7 +4,7 @@ const base64url = require('base64url')
 const moment = require('moment')
 const checkoutsdk = require('@paypal/checkout-server-sdk')
 
-const { CALC_PRICE, PAYPAL_ID, PAYPAL_SECRET, IllegalInputError } = require('../common')
+const { CALC_PRICE, PAYPAL_ID, PAYPAL_SECRET } = require('../common')
 const { makeSQLBatch } = require('../utils/sqlite')
 const { randomBytes } = require('../utils/promisified')
 
@@ -40,7 +40,7 @@ module.exports = (redis, sqlite) => {
     redis.SISMEMBER('order:used', paypalId).then(yes => {
       if (yes === 1) {
         // this order is already used
-        throw IllegalInputError('Order id already used')
+        throw createError(400, 'Order id already used')
       }
 
       const request = new checkoutsdk.orders.OrdersGetRequest(paypalId)
@@ -49,10 +49,10 @@ module.exports = (redis, sqlite) => {
     }).then(order => {
       // validate order
       if (order.result.purchase_units[0].amount.currency_code !== 'USD') {
-        throw IllegalInputError('Only USD is accepted as paying currency')
+        throw createError(400, 'Only USD is accepted as paying currency')
       }
       if (order.result.status !== 'COMPLETED') {
-        throw IllegalInputError('Transaction is incomplete')
+        throw createError(400, 'Transaction is incomplete')
       }
 
       value = order.result.purchase_units[0].amount.value
@@ -89,14 +89,14 @@ module.exports = (redis, sqlite) => {
       const bigprice = CALC_PRICE(sumSize)
 
       if (bigprice < 500) {
-        throw IllegalInputError('Total is below minimum')
+        throw createError(400, 'Total is below minimum')
       }
 
       const priceStr = bigprice.toString()
       price = priceStr.slice(0, -2) + '.' + priceStr.slice(-2)
 
       if (value !== price) {
-        throw IllegalInputError('Total is invalid')
+        throw createError(400, 'Total is invalid')
       }
 
       return randomBytes(32)
@@ -143,12 +143,7 @@ module.exports = (redis, sqlite) => {
     }).then(count => {
       res.json({ success: true })
     }).catch(err => {
-      console.error(err, paypalId)
-      if (err instanceof IllegalInputError) {
-        next(createError(400, err.message))
-      } else {
-        next(createError(500, 'Internal error'))
-      }
+      next(err)
     })
   }
 }

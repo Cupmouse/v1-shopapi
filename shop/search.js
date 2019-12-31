@@ -1,5 +1,3 @@
-const createError = require('http-errors')
-
 const { NUL_LIMIT, SQL_PRICE } = require('../common')
 
 module.exports = sqlite => {
@@ -46,15 +44,13 @@ module.exports = sqlite => {
     let ids
     sqlite.prepare('SELECT id FROM items' + where, function (err) {
       if (err) {
-        console.log(err)
-        next(createError(500, 'Internal error'))
+        next(err)
         return
       }
 
       this.all(params, (err, rows) => {
         if (err) {
-          console.log(err)
-          next(createError(500, 'Internal error'))
+          next(err)
           this.finalize()
           return
         }
@@ -75,15 +71,13 @@ module.exports = sqlite => {
 
         sqlite.prepare(sql, function (err) {
           if (err) {
-            console.log(err)
-            next(createError(500, 'Internal error'))
+            next(err)
             return
           }
 
           this.all(params, (err, rows) => {
             if (err) {
-              console.log(err)
-              next(createError(500, 'Internal error'))
+              next(err)
             } else {
               res.json({
                 ids: ids,

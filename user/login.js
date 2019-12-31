@@ -18,7 +18,7 @@ module.exports = redis => {
     redis.GET(keyPassword)
       .then(stored => {
         if (stored == null) {
-          throw IllegalInputError('Authentication error: user id or password is incorrect')
+          throw createError(400, 'Authentication error: user id or password is incorrect')
         } else {
           return bcrypt.compare(password, stored)
         }
@@ -28,7 +28,7 @@ module.exports = redis => {
           return randomBytes(LENGTH_SESSION_ID)
         } else {
         // failed login
-          throw IllegalInputError('Authentication error: user id or password is incorrect')
+          throw IllegalInputError(400, 'Authentication error: user id or password is incorrect')
         }
       }).then(bytes => {
         sessionId = bytes.toString('hex')
@@ -52,13 +52,8 @@ module.exports = redis => {
           throw Error('PEXPIRE failed')
         }
       }).catch(err => {
-      // catched exception while autheticating
-        if (err instanceof IllegalInputError) {
-          next(createError(400, err.message))
-        } else {
-          console.log(err)
-          next(createError(500, 'Internal error'))
-        }
+        // catched exception while autheticating
+        next(err)
       })
   }
 }
