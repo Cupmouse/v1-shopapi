@@ -41,7 +41,7 @@ app.use((err, req, res, next) => {
   res.locals.message = err.message
   res.locals.error = req.app.get('env') === 'development' ? err : {}
 
-  console.log(err)
+  console.log(err.message)
   const statusCode = err.statusCode === undefined ? 500 : err.statusCode
   res.status(statusCode).json({
     error: err.message

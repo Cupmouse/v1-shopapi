@@ -4,7 +4,7 @@ const base64url = require('base64url')
 const moment = require('moment')
 const checkoutsdk = require('@paypal/checkout-server-sdk')
 
-const { CALC_PRICE, PAYPAL_ID, PAYPAL_SECRET } = require('../common')
+const { CALC_PRICE, PAYPAL_ID, PAYPAL_SECRET, IllegalInputError } = require('../common')
 const { makeSQLBatch } = require('../utils/sqlite')
 const { randomBytes } = require('../utils/promisified')
 
@@ -40,7 +40,7 @@ module.exports = (redis, sqlite) => {
     redis.SISMEMBER('order:used', paypalId).then(yes => {
       if (yes === 1) {
         // this order is already used
-        return Promise.reject('orderid')
+        throw IllegalInputError('Order id already used')
       }
 
       const request = new checkoutsdk.orders.OrdersGetRequest(paypalId)
@@ -49,10 +49,10 @@ module.exports = (redis, sqlite) => {
     }).then(order => {
       // validate order
       if (order.result.purchase_units[0].amount.currency_code !== 'USD') {
-        return Promise.reject('onlyusd')
+        throw IllegalInputError('Only USD is accepted as paying currency')
       }
       if (order.result.status !== 'COMPLETED') {
-        return Promise.reject('incomplete')
+        throw IllegalInputError('Transaction is incomplete')
       }
 
       value = order.result.purchase_units[0].amount.value
@@ -89,14 +89,14 @@ module.exports = (redis, sqlite) => {
       const bigprice = CALC_PRICE(sumSize)
 
       if (bigprice < 500) {
-        return Promise.reject('toosmall')
+        throw IllegalInputError('Total is below minimum')
       }
 
       const priceStr = bigprice.toString()
       price = priceStr.slice(0, -2) + '.' + priceStr.slice(-2)
 
       if (value !== price) {
-        return Promise.reject('value')
+        throw IllegalInputError('Total is invalid')
       }
 
       return randomBytes(32)
@@ -143,24 +143,11 @@ module.exports = (redis, sqlite) => {
     }).then(count => {
       res.json({ success: true })
     }).catch(err => {
-      if (err === 'orderid') {
-        console.error('Order id already used', paypalId)
-        next(createError(400, 'Order id already used'))
-      } else if (err === 'onlyusd') {
-        console.log('Only accepts USD', paypalId)
-        next(createError(400, 'Only USD is accepted'))
-      } else if (err === 'toosmall') {
-        console.log('Total is too small')
-        next(createError(400, 'Total is too small'))
-      } else if (err === 'incomplete') {
-        console.log('Not complete', paypalId)
-        next(createError(400, 'Order is not complete'))
-      } else if (err === 'value') {
-        console.log(paypalId)
-        next(createError(400, 'Payment value mismatch'))
+      console.error(err, paypalId)
+      if (err instanceof IllegalInputError) {
+        next(createError(400, err.message))
       } else {
-        console.log(err, paypalId)
-        next(createError(500, 'Communication error'))
+        next(createError(500, 'Internal error'))
       }
     })
   }

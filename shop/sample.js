@@ -5,6 +5,7 @@ const zlib = require('zlib')
 const readline = require('readline')
 
 const { DATA_PATH } = require('../common')
+const { IllegalInputError } = require('../common')
 
 module.exports = sqlite => {
   return (req, res, next) => {
@@ -35,7 +36,7 @@ module.exports = sqlite => {
       })
     }).then(row => {
       if (row === undefined) {
-        return Promise.reject('id')
+        throw new IllegalInputError('Unknown item ID given')
       }
 
       const name = row.name
@@ -66,11 +67,11 @@ module.exports = sqlite => {
       res.setHeader('content-type', 'text/plain')
       res.send(text)
     }).catch(err => {
-      if (err === 'id') {
-        next(createError(400, 'Database with id not found'))
+      if (err instanceof IllegalInputError) {
+        next(createError(400, err.message))
       } else {
         console.log(err)
-        next(createError(500, 'Database error'))
+        next(createError(500, 'Error occurred'))
       }
     })
   }

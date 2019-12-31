@@ -1,7 +1,7 @@
 const express = require('express')
 const createError = require('http-errors')
 
-const { DOWNLOAD_LIMIT, DATA_PATH } = require('./common')
+const { DOWNLOAD_LIMIT, DATA_PATH, IllegalInputError } = require('./common')
 
 module.exports = (redis, sqlite) => {
   const router = express.Router()
@@ -17,7 +17,7 @@ module.exports = (redis, sqlite) => {
 
     redis.GET('itemcode:' + itemCode + ':id').then(id => {
       if (id === null) {
-        return Promise.reject('invalid')
+        throw IllegalInputError('Invalid code')
       }
 
       itemId = id
@@ -25,7 +25,7 @@ module.exports = (redis, sqlite) => {
       return redis.GET('itemcode:' + itemCode + ':count')
     }).then(count => {
       if (count >= DOWNLOAD_LIMIT) {
-        return Promise.reject('limit')
+        throw IllegalInputError('Item download limit reached')
       }
 
       return redis.INCR('itemcode:' + itemCode + ':count')
@@ -55,15 +55,11 @@ module.exports = (redis, sqlite) => {
 
       res.download(path)
     }).catch(err => {
-      if (err === 'invalid') {
-        console.log('Invalid code')
-        next(createError(400, 'Invalid code'))
-      } else if (err === 'limit') {
-        console.log('limit')
-        next(createError(400, 'Item download limit reached'))
+      if (err instanceof IllegalInputError) {
+        next(createError(400, err.message))
       } else {
         console.log(err)
-        next(createError(500, 'Database error'))
+        next(createError(500, 'Internal error'))
       }
     })
   })

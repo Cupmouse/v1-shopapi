@@ -47,14 +47,14 @@ module.exports = sqlite => {
     sqlite.prepare('SELECT id FROM items' + where, function (err) {
       if (err) {
         console.log(err)
-        next(createError(500, 'Database error'))
+        next(createError(500, 'Internal error'))
         return
       }
 
       this.all(params, (err, rows) => {
         if (err) {
           console.log(err)
-          next(createError(500, 'Database error'))
+          next(createError(500, 'Internal error'))
           this.finalize()
           return
         }
@@ -76,14 +76,14 @@ module.exports = sqlite => {
         sqlite.prepare(sql, function (err) {
           if (err) {
             console.log(err)
-            next(createError(500, 'Database error'))
+            next(createError(500, 'Internal error'))
             return
           }
 
           this.all(params, (err, rows) => {
             if (err) {
               console.log(err)
-              next(createError(500, 'Database error'))
+              next(createError(500, 'Internal error'))
             } else {
               res.json({
                 ids: ids,

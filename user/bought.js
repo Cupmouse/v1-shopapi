@@ -8,7 +8,7 @@ module.exports = redis => {
       .then(bids => res.json(bids.map(bid => parseInt(bid))))
       .catch(err => {
         console.log(err)
-        next(createError(500, 'Database error'))
+        next(createError(500, 'Internal error'))
       })
   }
 }

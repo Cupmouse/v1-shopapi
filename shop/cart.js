@@ -62,7 +62,7 @@ module.exports = sqlite => {
       })
     }).catch(err => {
       console.log(err)
-      next(createError(500, 'Database error'))
+      next(createError(500, 'Internal error'))
     })
   }
 }

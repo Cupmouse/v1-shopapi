@@ -8,19 +8,15 @@ module.exports = redis => {
 
     // make session time longer
     redis.PEXPIRE(keySession, SESSION_TIME)
-      .then((timeout) => {
+      .then(timeout => {
         if (timeout === 1) {
           next()
         } else {
-          return Promise.reject('notok')
+          throw Error('PEXPIRE failed')
         }
-      }).catch((err) => {
-        if (err === 'notok') {
-          next(createError(500, 'Session error'))
-        } else {
-          console.log(err)
-          next(createError(500, 'Database error'))
-        }
+      }).catch(err => {
+        console.log(err)
+        next(createError(500, 'Internal error'))
       })
   }
 }

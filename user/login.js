@@ -2,7 +2,7 @@ const createError = require('http-errors')
 
 const bcrypt = require('bcrypt')
 
-const { SESSION_TIME, LENGTH_SESSION_ID } = require('../common')
+const { SESSION_TIME, LENGTH_SESSION_ID, IllegalInputError } = require('../common')
 const { randomBytes } = require('../utils/promisified')
 
 module.exports = redis => {
@@ -16,32 +16,32 @@ module.exports = redis => {
     let sessionId = null
 
     redis.GET(keyPassword)
-      .then((stored) => {
+      .then(stored => {
         if (stored == null) {
-          return Promise.reject('failed')
+          throw IllegalInputError('Authentication error: user id or password is incorrect')
         } else {
           return bcrypt.compare(password, stored)
         }
-      }).then((isCorrect) => {
+      }).then(isCorrect => {
         if (isCorrect) {
         // generate new session id
           return randomBytes(LENGTH_SESSION_ID)
         } else {
         // failed login
-          return Promise.reject('failed')
+          throw IllegalInputError('Authentication error: user id or password is incorrect')
         }
-      }).then((bytes) => {
+      }).then(bytes => {
         sessionId = bytes.toString('hex')
 
         return redis.SET(keySession, sessionId)
-      }).then((result) => {
+      }).then(result => {
         if (result === 'OK') {
         // set default expiery time
           return redis.PEXPIRE(keySession, SESSION_TIME)
         } else {
-          return Promise.reject('notok')
+          throw Error('SET failed')
         }
-      }).then((timeout) => {
+      }).then(timeout => {
       // all procedure done, login ok
         if (timeout === 1) {
           res.json({
@@ -49,17 +49,15 @@ module.exports = redis => {
             session_id: sessionId
           })
         } else {
-          return Promise.reject('notok')
+          throw Error('PEXPIRE failed')
         }
-      }).catch((err) => {
+      }).catch(err => {
       // catched exception while autheticating
-        if (err === 'failed') {
-          next(createError(401, 'Authentication error: user id or password is incorrect'))
-        } else if (err === 'notok') {
-          next(createError(500, 'Session error'))
+        if (err instanceof IllegalInputError) {
+          next(createError(400, err.message))
         } else {
           console.log(err)
-          next(createError(500, 'Database error'))
+          next(createError(500, 'Internal error'))
         }
       })
   }
