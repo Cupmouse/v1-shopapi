@@ -1,3 +1,5 @@
 module.exports = (req, res, next) => {
-  res.json({'status': true});
-};
+  res.json({
+    status: true
+  })
+}

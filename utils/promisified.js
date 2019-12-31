@@ -1,4 +1,4 @@
-const util = require('util');
-const crypto = require('crypto');
+const util = require('util')
+const crypto = require('crypto')
 
-exports.randomBytes = util.promisify(crypto.randomBytes).bind(crypto);
+exports.randomBytes = util.promisify(crypto.randomBytes).bind(crypto)

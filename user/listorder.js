@@ -1,16 +1,17 @@
-const createError = require('http-errors');
+const createError = require('http-errors')
 
 module.exports = redis => {
   return (req, res, next) => {
-    const user_id = req.body.user_id;
+    const userId = req.body.user_id
 
-    redis.LRANGE('user:' + user_id + ':order', 0, -1).then(order_ids => {
-      if (order_ids === null)
-        order_ids = [];
-      res.json(order_ids);
+    redis.LRANGE('user:' + userId + ':order', 0, -1).then(orderIds => {
+      if (orderIds === null) {
+        orderIds = []
+      }
+      res.json(orderIds)
     }).catch(err => {
-      console.log(err);
-      next(createError(500, 'Database error'));    
-    });
-  };
-};
+      console.log(err)
+      next(createError(500, 'Database error'))
+    })
+  }
+}

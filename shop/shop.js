@@ -4,7 +4,7 @@ const search = require('./search');
 const cart = require('./cart');
 const sample = require('./sample');
 
-module.exports = (sqlite) => {
+module.exports = sqlite => {
   const router = express.Router();
 
   router.post('/search', search(sqlite));
