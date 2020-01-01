@@ -41,14 +41,19 @@ module.exports = sqlite => {
       const name = row.name
       const path = DATA_PATH + name + '.gz'
 
-      const lineReader = readline.createInterface({
-        input: fs.createReadStream(path).pipe(zlib.createGunzip())
-      })
-
-      let n = 0
-      let text = ''
-
       return new Promise((resolve, reject) => {
+        const lineReader = readline.createInterface({
+          input: fs.createReadStream(path)
+            .on('error', (err) => {
+              lineReader.close()
+              reject(err)
+            })
+            .pipe(zlib.createGunzip())
+        })
+
+        let n = 0
+        let text = ''
+
         lineReader.on('line', (line) => {
           text += line + '\n'
           if (n >= 1000) {

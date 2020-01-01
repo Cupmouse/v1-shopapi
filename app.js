@@ -41,14 +41,14 @@ app.use((err, req, res, next) => {
   res.locals.message = err.message
   res.locals.error = req.app.get('env') === 'development' ? err : {}
 
-  if (err.statusCode === undefined) {
+  if (err instanceof createError.HttpError) {
+    res.status(err.statusCode).json({
+      error: err.message
+    })
+  } else {
     console.error(err)
     res.status(500).json({
       error: 'Internal error'
-    })
-  } else {
-    res.status(err.statusCode).json({
-      error: err.message
     })
   }
 })
